@@ -15,6 +15,10 @@ import { IFacultadDTO } from './interfaces/IFacultadDTO';
 import { ICursoDTO } from './interfaces/ICursoDTO';
 import { IEvaluacionDTO } from './interfaces/IEvaluacionDTO';
 import { IEstudianteCursoDTO } from './interfaces/IEstudianteCursoDTO';
+import { IProfesorAccessValidator } from './patterns/proxy/IProfesorAccessValidator';
+import { ProfesorAccessValidatorProxy } from './patterns/proxy/profesorAccessValidatorProxy';
+
+const profesorAccessValidator: IProfesorAccessValidator = new ProfesorAccessValidatorProxy();
 
 const app = express();
 app.use(express.json());
@@ -81,6 +85,12 @@ app.post('/api/proyectos', async (req: Request<{}, {}, ICreateProjectRequestBody
   try {
     const { nombre, descripcion, profesor_id, curso_id } = req.body;
 
+    // Proxy: valida (con caché) que profesor_id exista y tenga rol
+    // 'profesor' ANTES de intentar construir/guardar el proyecto.
+    if (profesor_id) {
+      await profesorAccessValidator.validarAcceso(profesor_id);
+    }
+
     const builder = new ProjectBuilder();
     if (descripcion) builder.setDescripcion(descripcion);
     if (profesor_id) builder.setProfesorResponsable(profesor_id);
@@ -91,7 +101,8 @@ app.post('/api/proyectos', async (req: Request<{}, {}, ICreateProjectRequestBody
 
     return res.status(201).json({ mensaje: 'Proyecto ICCIS creado correctamente', proyecto: nuevoProyecto });
   } catch (err: any) {
-    return res.status(400).json({ error: err.message });
+    const esAccesoNoPermitido = typeof err.message === 'string' && err.message.startsWith('Acceso no permitido');
+    return res.status(esAccesoNoPermitido ? 403 : 400).json({ error: err.message });
   }
 });
 
@@ -239,29 +250,6 @@ app.get('/api/facultades', async (req: Request, res: Response) => {
   }
 });
 
-app.get('/api/usuarios', async (req: Request, res: Response) => {
-  try {
-    const supabase = SupabaseSingleton.getInstance();
-    const { data, error } = await supabase
-      .from('usuarios')
-      .select(`
-        id, nombre, email, rol, creado_en,
-        pais:paises (id, nombre)
-      `);
-
-    if (error) return res.status(400).json({ error: error.message });
-
-    const usuariosFormateados: IUsuarioDTO[] = data?.map((usuario: any) => ({
-      ...usuario,
-      pais: Array.isArray(usuario.pais) ? usuario.pais[0] : (usuario.pais || null)
-    })) || [];
-
-    return res.status(200).json({ data: usuariosFormateados });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
-  }
-});
-
 app.get('/api/cursos', async (req: Request, res: Response) => {
   try {
     const supabase = SupabaseSingleton.getInstance();
@@ -336,5 +324,5 @@ app.get('/api/estudiantes-cursos', async (req: Request, res: Response) => {
 });
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor TypeScript en ejecución en http://localhost:${PORT}`);
+  console.log(`Servidor TypeScript en ejecución en http://localhost:${PORT}`);
 });

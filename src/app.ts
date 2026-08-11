@@ -250,6 +250,7 @@ app.get('/api/facultades', async (req: Request, res: Response) => {
   }
 });
 
+
 app.get('/api/cursos', async (req: Request, res: Response) => {
   try {
     const supabase = SupabaseSingleton.getInstance();
@@ -322,6 +323,33 @@ app.get('/api/estudiantes-cursos', async (req: Request, res: Response) => {
     return res.status(500).json({ error: err.message });
   }
 });
+
+app.get('/api/proyectos', async (req: Request, res: Response) => {
+  try {
+    const supabase = SupabaseSingleton.getInstance();
+    const { data, error } = await supabase
+      .from('proyectos')
+      .select(`
+        id, nombre, creado_en, estado,
+        curso:cursos (id, nombre),
+        profesor:usuarios (id, nombre, email)
+      `);
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    const proyectosFormateadas: IProyectoDTO[] = data?.map((proyecto: any) => ({
+      ...proyecto,
+      curso: Array.isArray(proyecto.curso) ? proyecto.curso[0] : (proyecto.curso || null),
+      profesor: Array.isArray(proyecto.profesor) ? proyecto.profesor[0] : (proyecto.profesor || null)
+    })) || [];
+
+    return res.status(200).json({ data: proyectosFormateadas });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`Servidor TypeScript en ejecución en http://localhost:${PORT}`);

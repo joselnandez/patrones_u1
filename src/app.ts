@@ -85,8 +85,6 @@ app.post('/api/proyectos', async (req: Request<{}, {}, ICreateProjectRequestBody
   try {
     const { nombre, descripcion, profesor_id, curso_id } = req.body;
 
-    // Proxy: valida (con caché) que profesor_id exista y tenga rol
-    // 'profesor' ANTES de intentar construir/guardar el proyecto.
     if (profesor_id) {
       await profesorAccessValidator.validarAcceso(profesor_id);
     }

@@ -1,5 +1,6 @@
 import { SupabaseSingleton } from '../config/supabase';
 import { IEvaluacionProyecto } from '../interfaces/evaluacion.interface';
+import { IProyectoObserver } from '../patterns/observer/IProyectoObserver';
 
 export interface IEvaluacionResultado {
   cerrado: boolean;
@@ -8,6 +9,18 @@ export interface IEvaluacionResultado {
 }
 
 export class ProjectService {
+  private static readonly observadores: IProyectoObserver[] = [];
+
+  public static suscribir(observer: IProyectoObserver): void {
+    ProjectService.observadores.push(observer);
+  }
+
+  private static async notificarCierre(proyectoId: string, estado: IEvaluacionResultado): Promise<void> {
+    for (const observer of ProjectService.observadores) {
+      await observer.onProyectoCerrado(proyectoId, estado);
+    }
+  }
+
   public static async evaluarEstadoProyecto(proyectoId: string): Promise<IEvaluacionResultado> {
     const supabase = SupabaseSingleton.getInstance();
 
@@ -19,7 +32,7 @@ export class ProjectService {
     if (error || !evaluaciones || evaluaciones.length === 0) {
       return {
         cerrado: false,
-        mensaje: 'Sin evaluaciones registradas aún.',
+        mensaje: 'Sin evaluaciones registradas aun.',
         porcentajeDeficientes: 0
       };
     }
@@ -34,11 +47,15 @@ export class ProjectService {
         .update({ estado: 'cerrado' })
         .eq('id', proyectoId);
 
-      return {
+      const resultado: IEvaluacionResultado = {
         cerrado: true,
         mensaje: `Proyecto cerrado automáticamente. El ${porcentajeDeficientes.toFixed(1)}% de las evaluaciones son menores a 70 puntos.`,
         porcentajeDeficientes
       };
+
+      await ProjectService.notificarCierre(proyectoId, resultado);
+
+      return resultado;
     }
 
     return {

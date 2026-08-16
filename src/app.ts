@@ -17,8 +17,13 @@ import { IEvaluacionDTO } from './interfaces/IEvaluacionDTO';
 import { IEstudianteCursoDTO } from './interfaces/IEstudianteCursoDTO';
 import { IProfesorAccessValidator } from './patterns/proxy/IProfesorAccessValidator';
 import { ProfesorAccessValidatorProxy } from './patterns/proxy/profesorAccessValidatorProxy';
+import { ProyectoLogObserver } from './patterns/observer/proyectoLogObserver';
+import { ProyectoNotificacionPersistenceObserver } from './patterns/observer/proyectoNotificacionPersistenceObserver';
 
 const profesorAccessValidator: IProfesorAccessValidator = new ProfesorAccessValidatorProxy();
+
+ProjectService.suscribir(new ProyectoLogObserver());
+ProjectService.suscribir(new ProyectoNotificacionPersistenceObserver());
 
 const app = express();
 app.use(express.json());
